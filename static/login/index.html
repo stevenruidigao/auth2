@@ -1,14 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
+		<link rel="stylesheet" href="/css/main.css" defer>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<script src="/js/argon2-bundled.min.js" defer></script>
 		<script src="/js/main.js"></script>
+		<title>Log in</title>
 	</head>
 	<body>
-		<p>Log in:</p>
-		<label for="username">Username:</label>
-		<input type="text" id="username" name="username">
-		<label for="password">Password:</label>
-		<input type="text" id="password" name="password">
-		<button onclick="login()">Submit</button>
+		<div class="prompt center">
+			<p>Log in:</p>
+			<div class="fullwidth">
+				<label for="username">Username:</label>
+				<input type="text" id="username" name="username" placeholder="Username" spellcheck="false">
+			</div>
+			<div class="fullwidth">
+				<label for="password">Password:</label>
+				<input type="password" id="password" name="password" placeholder="Password" spellcheck="false">
+			</div>
+			<button onclick="login()">Submit</button>
+		</div>
 	</body>
 </html>

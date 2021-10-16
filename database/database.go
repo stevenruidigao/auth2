@@ -13,23 +13,19 @@ func FindUser(user *User, database *mongo.Database) *User {
 	var result *User
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	data, err := bson.Marshal(&user)
+	cur := database.Collection("Users").FindOne(ctx, bson.M{"username": user.Username})
 
-	if err != nil {
-		fmt.Println(err)
+	if cur.Err() == mongo.ErrNoDocuments {
 		return nil
-	}
 
-	cur := database.Collection("Users").FindOne(ctx, data)
-
-	if cur.Err() != nil {
-		fmt.Println(cur.Err())
-		return nil
+	} else if cur.Err() != nil {
+		fmt.Println("Err:", cur.Err())
+		user.Success = false
+		return user
 	}
 
 	cur.Decode(&result)
-	fmt.Println("Found:", result)
-
+	result.Success = true
 	return result
 }
 
@@ -39,11 +35,14 @@ func RegisterUser(user *User, database *mongo.Database) *User {
 	defer cancel()
 	cur := database.Collection("Users").FindOne(ctx, bson.M{"username": user.Username})
 
-	if cur.Err() == nil || cur.Err() != mongo.ErrNoDocuments {
+	if cur.Err() == nil {
 		cur.Decode(&result)
 		result.Success = false
-		fmt.Println("Existing:", result)
 		return result
+
+	} else if cur.Err() != mongo.ErrNoDocuments {
+		fmt.Println("Err:", cur.Err())
+		return nil
 	}
 
 	ctx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
@@ -55,7 +54,6 @@ func RegisterUser(user *User, database *mongo.Database) *User {
 		return nil
 	}
 
-	fmt.Println("Success:", user)
 	user.Success = true
 	return user
 }
@@ -70,7 +68,6 @@ func UpdateUser(user *User, database *mongo.Database) *User {
 		return nil
 	}
 
-	fmt.Println("Success:", user)
 	user.Success = true
 	return user
 }

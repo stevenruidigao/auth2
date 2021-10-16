@@ -1,36 +1,48 @@
 function goLogin() {
-	window.location.href = "/login";
+	window.location.href = '/login';
+}
+
+function goRegister() {
+	window.location.href = '/register';
 }
 
 function login() {
-	username = document.getElementById("username")
-	password = document.getElementById("password")
+	username = document.getElementById('username');
+	password = document.getElementById('password');
 
 	if (username != null && password != null) {
-		POSTData("/api/auth/login", {"username": username.value, "passwordHash": password.value}).then(response => {
-			if (response.success) {
-				window.location.href = "/logged_in";
-			}
+		makeJSONRequest('/api/auth/salt', {'username': username.value}, 'POST').then(function (response) {
+			argon2.hash({pass: password.value, salt: response.message, time: 20, type:argon2.ArgonType.Argon2id}).then(function (hash) {
+				makeJSONRequest('/api/auth/login', {'username': username.value, 'passwordHash': hash.encoded}, 'POST').then(function (response) {
+					if (response.success) {
+//						window.location.href = '/logged_in';
+					}
+				});
+			});
 		});
 	}
 }
 
 function register() {
-	username = document.getElementById("username")
-	password = document.getElementById("password")
+	username = document.getElementById('username');
+	password = document.getElementById('password');
 
 	if (username != null && password != null) {
-		POSTData("/api/auth/register", {"username": username.value, "passwordHash": password.value}).then(response => {
-			if (response.success) {
-				window.location.href = "/registered";
-			}
+		salt = '' + Math.random();
+
+		argon2.hash({pass: password.value, salt: salt, time: 20, type:argon2.ArgonType.Argon2id}).then(function (hash) {
+			makeJSONRequest('/api/auth/register', {'username': username.value, 'passwordHash': hash.encoded, 'salt': salt}, 'POST').then(function (response) {
+				if (response.success) {
+//					window.location.href = '/registered';
+				}
+			});
 		});
 	}
 }
 
-async function POSTData(url, data) {
+async function makeJSONRequest(url, data, method='GET') {
 	const response = await fetch(url, {
-		method: 'POST',
+		method: method,
 		mode: 'cors', // no-cors, *cors, same-origin
 		cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
 		credentials: 'same-origin', // include, *same-origin, omit

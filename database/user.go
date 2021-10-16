@@ -13,9 +13,10 @@ type User struct {
 	Email         string
 	PhoneNumber   string
 	PasswordHash  string
+	Salt          string
 	Success       bool
 	Token         string
-	TokenTime     time.Time
+	TokenExpires  time.Time
 	WAIcon        string
 	WAID          []byte
 	WACredentials []webauthn.Credential

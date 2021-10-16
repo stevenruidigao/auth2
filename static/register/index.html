@@ -1,14 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
+		<link rel="stylesheet" href="/css/main.css" defer>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<script src="/js/argon2-bundled.min.js" defer></script>
 		<script src="/js/main.js"></script>
+		<title>Register</title>
 	</head>
 	<body>
-		<p>Register:</p>
-		<label for="username">Username:</label>
-		<input type="text" id="username" name="username">
-		<label for="password">Password:</label>
-		<input type="text" id="password" name="password">
-		<button onclick="register()">Submit</button>
+		<div class="prompt center">
+			<p>Register:</p>
+			<div class="fullwidth">
+				<label for="username">Username:</label>
+				<input type="text" id="username" name="username" placeholder="Username" spellcheck="false">
+			</div>
+			<div class="fullwidth">
+				<label for="password">Password:</label>
+				<input type="password" id="password" name="password" placeholder="Password" spellcheck="false">
+			</div>
+			<button onclick="register()">Submit</button>
+		</div>
 	</body>
 </html>
