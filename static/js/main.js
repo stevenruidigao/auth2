@@ -12,13 +12,15 @@ function login() {
 
 	if (username != null && password != null) {
 		makeJSONRequest('/api/auth/salt', {'username': username.value}, 'POST').then(function (response) {
-			argon2.hash({pass: password.value, salt: response.message, time: 20, type:argon2.ArgonType.Argon2id}).then(function (hash) {
-				makeJSONRequest('/api/auth/login', {'username': username.value, 'passwordHash': hash.encoded}, 'POST').then(function (response) {
-					if (response.success) {
-//						window.location.href = '/logged_in';
-					}
+			if (response.success) {
+				argon2.hash({pass: password.value, salt: response.message, time: 20, type:argon2.ArgonType.Argon2id}).then(function (hash) {
+					makeJSONRequest('/api/auth/login', {'username': username.value, 'passwordHash': hash.encoded}, 'POST').then(function (response) {
+						if (response.success) {
+	//						window.location.href = '/logged_in';
+						}
+					});
 				});
-			});
+			}
 		});
 	}
 }
