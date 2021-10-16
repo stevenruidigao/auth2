@@ -1,15 +1,16 @@
 package main
 
 import (
-	"authenticate/database"
-	"authenticate/utils"
-
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
+
+	"golang.org/x/time/rate"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -17,6 +18,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+
+	"authenticate/database"
+	"authenticate/utils"
 )
 
 type Message struct {
@@ -24,7 +28,14 @@ type Message struct {
 	Message string `json:"message"`
 }
 
+type Visitor struct {
+	Limiter  *rate.Limiter
+	LastSeen time.Time
+}
+
 var userDatabase *mongo.Database
+var visitors map[string]*Visitor
+var visitorsMutex sync.Mutex
 
 func main() {
 	DBHost := "127.0.0.1"
@@ -36,12 +47,16 @@ func main() {
 	port := 8080
 
 	router := mux.NewRouter()
-	apiRouter := router.PathPrefix("/api").Subrouter()
+	//	apiRouter := router.PathPrefix("/api").Subrouter()
+	apiRouter := mux.NewRouter().PathPrefix("/api").Subrouter()
 	authRouter := apiRouter.PathPrefix("/auth").Subrouter()
 	authRouter.Path("/login").Methods(http.MethodPost).HandlerFunc(Login)
 	authRouter.Path("/register").Methods(http.MethodPost).HandlerFunc(Register)
 	authRouter.Path("/salt").Methods(http.MethodPost).HandlerFunc(Salt)
+	router.PathPrefix("/api").Handler(Limit(apiRouter))
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./static")))
+
+	go CleanUpVisitors()
 
 	uri := "mongodb://" + DBHost + ":" + DBPort + "/" + DBName + "?maxPoolSize=" + DBMaxPoolSize
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -63,6 +78,7 @@ func main() {
 	}
 
 	userDatabase = client.Database(DBName)
+	visitors = map[string]*Visitor{}
 
 	fmt.Println("Listening on " + host + ":" + strconv.Itoa(port))
 	http.ListenAndServe(host+":"+strconv.Itoa(port), router)
@@ -73,36 +89,39 @@ func Login(writer http.ResponseWriter, request *http.Request) {
 	err := json.NewDecoder(request.Body).Decode(&credentials)
 
 	if err != nil {
-		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, 200)
+		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusOK)
 		return
 	}
 
 	user := database.FindUser(&database.User{Username: credentials.Username}, userDatabase)
-	credentials.PasswordHash = utils.Argon2(credentials.PasswordHash, user.Salt)
 
 	if user == nil {
-		utils.JSONResponse(writer, Message{Success: false, Message: "That user couldn't be found."}, 401)
+		utils.JSONResponse(writer, Message{Success: false, Message: "That user couldn't be found."}, http.StatusUnauthorized)
 
 	} else if !user.Success {
-		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, 500)
-
-	} else if credentials.PasswordHash != user.PasswordHash {
-		utils.JSONResponse(writer, Message{Success: false, Message: "That password was incorrect."}, 401)
+		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
 
 	} else {
-		authenticated := Authenticate(request)
+		credentials.PasswordHash = utils.Argon2(credentials.PasswordHash, user.Salt)
 
-		if time.Since(user.TokenExpires) > 0 {
-			user.Token = uuid.NewString()
-			user.TokenExpires = time.Now().Add(24 * time.Hour)
-			database.UpdateUser(user, userDatabase)
-			utils.AddCookie(writer, "token", user.Token, time.Until(user.TokenExpires))
+		if credentials.PasswordHash != user.PasswordHash {
+			utils.JSONResponse(writer, Message{Success: false, Message: "That password was incorrect."}, http.StatusUnauthorized)
 
-		} else if authenticated == nil || authenticated.ID != user.ID {
-			utils.AddCookie(writer, "token", user.Token, time.Until(user.TokenExpires))
+		} else {
+			authenticated := Authenticate(request)
+
+			if time.Since(user.TokenExpires) > 0 {
+				user.Token = uuid.NewString()
+				user.TokenExpires = time.Now().Add(24 * time.Hour)
+				database.UpdateUser(user, userDatabase)
+				utils.AddCookie(writer, "token", user.Token, time.Until(user.TokenExpires))
+
+			} else if authenticated == nil || authenticated.ID != user.ID {
+				utils.AddCookie(writer, "token", user.Token, time.Until(user.TokenExpires))
+			}
+
+			utils.JSONResponse(writer, Message{Success: true, Message: "You logged in successfully."}, http.StatusOK)
 		}
-
-		utils.JSONResponse(writer, Message{Success: true, Message: "You logged in successfully."}, 200)
 	}
 }
 
@@ -111,7 +130,7 @@ func Register(writer http.ResponseWriter, request *http.Request) {
 	err := json.NewDecoder(request.Body).Decode(&user)
 
 	if err != nil {
-		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, 500)
+		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
 		return
 	}
 
@@ -123,14 +142,14 @@ func Register(writer http.ResponseWriter, request *http.Request) {
 		utils.JSONResponse(writer, Message{Success: false, Message: "An account with that name already exists."}, 403)
 
 	} else if !result.Success {
-		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, 500)
+		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
 
 	} else {
 		user.Token = uuid.NewString()
 		user.TokenExpires = time.Now().Add(24 * time.Hour)
 		database.UpdateUser(&user, userDatabase)
 		utils.AddCookie(writer, "token", user.Token, time.Until(user.TokenExpires))
-		utils.JSONResponse(writer, Message{Success: true, Message: "Your account was created successfully."}, 200)
+		utils.JSONResponse(writer, Message{Success: true, Message: "Your account was created successfully."}, http.StatusOK)
 	}
 }
 
@@ -140,13 +159,13 @@ func Salt(writer http.ResponseWriter, request *http.Request) {
 	result := database.FindUser(&database.User{Username: user.Username}, userDatabase)
 
 	if result == nil {
-		utils.JSONResponse(writer, Message{Success: false, Message: "That user couldn't be found."}, 401)
+		utils.JSONResponse(writer, Message{Success: false, Message: "That user couldn't be found."}, http.StatusUnauthorized)
 
 	} else if !result.Success {
-		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, 500)
+		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
 
 	} else {
-		utils.JSONResponse(writer, Message{Success: true, Message: result.Salt}, 200)
+		utils.JSONResponse(writer, Message{Success: true, Message: result.Salt}, http.StatusOK)
 	}
 }
 
@@ -158,4 +177,56 @@ func Authenticate(request *http.Request) *database.User {
 	}
 
 	return result
+}
+
+func GetLimiter(hash string) *rate.Limiter {
+	visitorsMutex.Lock()
+	defer visitorsMutex.Unlock()
+
+	visitor := visitors[hash]
+
+	if visitor == nil {
+		limiter := rate.NewLimiter(1, 5)
+		visitors[hash] = &Visitor{limiter, time.Now()}
+		return limiter
+	}
+
+	visitor.LastSeen = time.Now()
+	return visitor.Limiter
+}
+
+func Limit(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		ip, _, err := net.SplitHostPort(request.RemoteAddr)
+
+		if err != nil {
+			fmt.Println(err)
+			utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
+			return
+		}
+
+		limiter := GetLimiter(utils.SHA512(ip))
+
+		if limiter.Allow() == false {
+			utils.JSONResponse(writer, Message{Success: false, Message: http.StatusText(429)}, http.StatusTooManyRequests)
+			return
+		}
+
+		handler.ServeHTTP(writer, request)
+	})
+}
+
+func CleanUpVisitors() {
+	for {
+		time.Sleep(time.Minute)
+		visitorsMutex.Lock()
+
+		for hash, visitor := range visitors {
+			if time.Since(visitor.LastSeen) > 3*time.Minute {
+				delete(visitors, hash)
+			}
+		}
+
+		visitorsMutex.Unlock()
+	}
 }
