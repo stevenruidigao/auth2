@@ -1,0 +1,14 @@
+{
+  "name": "authenticate",
+  "version": "0.0.1",
+  "description": "Browser code",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "argon2-browser": "^1.18.0"
+  }
+}
