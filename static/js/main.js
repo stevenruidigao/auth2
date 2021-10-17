@@ -28,7 +28,7 @@ function login() {
 						response = JSON.parse(request.response);
 
 						if (response.success) {
-							window.location.href = '/logged_in';
+//							window.location.href = '/logged_in';
 						}
 					});
 				});
@@ -61,7 +61,12 @@ function register() {
 	password = document.getElementById('password');
 
 	if (username != null && password != null) {
-		salt = '' + Math.random();
+		if (window.crypto == undefined) {
+			salt = '' + Math.random() + Math.random();
+
+		} else {
+			salt = bufferToBase64String(crypto.getRandomValues(new Uint8Array(64)));
+		}
 
 		argon2.hash({pass: password.value, salt: salt, time: 20, type:argon2.ArgonType.Argon2id}).then(function (hash) {
 			makeJSONRequest('/api/auth/register', {'username': username.value, 'passwordHash': hash.encoded, 'salt': salt}, 'POST').then(function (response) {
@@ -89,3 +94,15 @@ async function makeJSONRequest(url, data, method='GET') {
 
 	return response.json(); // parses JSON response into native JavaScript objects
 }
+
+function bufferToBase64String(buffer) {
+	var view = new Uint8Array(buffer);
+	var string = '';
+
+	for (i = 0; i < view.length; i ++) {
+		string += String.fromCharCode(view[i]);
+	}
+
+	return btoa(string);
+}
+

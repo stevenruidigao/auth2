@@ -1,6 +1,7 @@
 package database
 
 import (
+//	"encoding/binary"
 	"time"
 
 	"github.com/duo-labs/webauthn/webauthn"
@@ -35,7 +36,8 @@ func (user *User) WebAuthnIcon() string {
 }
 
 func (user *User) WebAuthnID() []byte {
-	return user.WAID
+	return []byte(user.ID)
+//	return user.WAID
 }
 
 func (user *User) WebAuthnName() string {

@@ -12,6 +12,7 @@ import (
 
 	"golang.org/x/time/rate"
 
+	"github.com/duo-labs/webauthn/webauthn"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 
@@ -20,6 +21,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 
 	"authenticate/database"
+	"authenticate/session"
 	"authenticate/utils"
 )
 
@@ -33,9 +35,11 @@ type Visitor struct {
 	LastSeen time.Time
 }
 
+var sessionStore *session.Store
 var userDatabase *mongo.Database
 var visitors map[string]*Visitor
 var visitorsMutex sync.Mutex
+var webAuthn *webauthn.WebAuthn
 
 func main() {
 	DBHost := "127.0.0.1"
@@ -46,12 +50,32 @@ func main() {
 	host := ""
 	port := 8080
 
+	var err error
+
+	webAuthn, err = webauthn.New(&webauthn.Config{
+		RPDisplayName: "Authenticate",
+		RPID:          "authenticate.ands.ee",
+		RPOrigin:      "https://authenticate.ands.ee",
+		RPIcon:        "https://duo.com/logo.png",
+	})
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	sessionStore, err = session.NewStore()
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	router := mux.NewRouter()
 	//	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter := mux.NewRouter().PathPrefix("/api").Subrouter()
 	authRouter := apiRouter.PathPrefix("/auth").Subrouter()
 	authRouter.Path("/login").Methods(http.MethodPost).HandlerFunc(Login)
 	authRouter.Path("/register").Methods(http.MethodPost).HandlerFunc(Register)
+	authRouter.Path("/register/webauthn/begin").Methods(http.MethodPost).HandlerFunc(BeginWebauthnRegistration)
 	authRouter.Path("/salt").Methods(http.MethodPost).HandlerFunc(Salt)
 	router.PathPrefix("/api").Handler(Limit(apiRouter))
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./static")))
@@ -178,6 +202,34 @@ func Authenticate(request *http.Request) *database.User {
 	}
 
 	return result
+}
+
+func BeginWebauthnRegistration(writer http.ResponseWriter, request *http.Request) {
+	var user database.User
+	json.NewDecoder(request.Body).Decode(&user)
+	result := database.FindUser(&database.User{Username: user.Username}, userDatabase)
+
+	if result == nil {
+		utils.JSONResponse(writer, Message{Success: false, Message: "That user couldn't be found."}, http.StatusInternalServerError)
+		return
+	}
+
+	options, sessionData, err := webAuthn.BeginRegistration(result)
+
+	if err != nil {
+		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
+		return
+	}
+
+	err = sessionStore.SaveWebauthnSession("registration", sessionData, request, writer)
+
+	if err != nil {
+		fmt.Println(err)
+		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
+		return
+	}
+
+	utils.JSONResponse(writer, options, http.StatusOK)
 }
 
 func GetLimiter(hash string) *rate.Limiter {
