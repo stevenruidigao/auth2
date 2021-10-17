@@ -156,6 +156,7 @@ func Register(writer http.ResponseWriter, request *http.Request) {
 func Salt(writer http.ResponseWriter, request *http.Request) {
 	var user database.User
 	json.NewDecoder(request.Body).Decode(&user)
+	fmt.Println(user)
 	result := database.FindUser(&database.User{Username: user.Username}, userDatabase)
 
 	if result == nil {

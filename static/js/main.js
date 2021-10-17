@@ -11,12 +11,24 @@ function login() {
 	password = document.getElementById('password');
 
 	if (username != null && password != null) {
-		makeJSONRequest('/api/auth/salt', {'username': username.value}, 'POST').then(function (response) {
+		request = new XMLHttpRequest();
+		request.open('POST', '/api/auth/salt', true);
+		request.send(JSON.stringify({'username': username.value}));
+
+		request.addEventListener('load', function () {
+			response = JSON.parse(request.response);
+
 			if (response.success) {
 				argon2.hash({pass: password.value, salt: response.message, time: 20, type:argon2.ArgonType.Argon2id}).then(function (hash) {
-					makeJSONRequest('/api/auth/login', {'username': username.value, 'passwordHash': hash.encoded}, 'POST').then(function (response) {
+					request = new XMLHttpRequest();
+					request.open('POST', '/api/auth/login', true);
+					request.send(JSON.stringify({'username': username.value, 'passwordHash': hash.encoded}));
+
+					request.addEventListener('load', function () {
+						response = JSON.parse(request.response);
+
 						if (response.success) {
-	//						window.location.href = '/logged_in';
+							window.location.href = '/logged_in';
 						}
 					});
 				});
@@ -24,6 +36,25 @@ function login() {
 		});
 	}
 }
+
+/*function login() {
+	username = document.getElementById('username');
+	password = document.getElementById('password');
+
+	if (username != null && password != null) {
+		makeJSONRequest('/api/auth/salt', {'username': username.value}, 'POST').then(function (response) {
+			if (response.success) {
+				argon2.hash({pass: password.value, salt: response.message, time: 20, type:argon2.ArgonType.Argon2id}).then(function (hash) {
+					makeJSONRequest('/api/auth/login', {'username': username.value, 'passwordHash': hash.encoded}, 'POST').then(function (response) {
+						if (response.success) {
+							window.location.href = '/logged_in';
+						}
+					});
+				});
+			}
+		});
+	}
+}*/
 
 function register() {
 	username = document.getElementById('username');
@@ -35,7 +66,7 @@ function register() {
 		argon2.hash({pass: password.value, salt: salt, time: 20, type:argon2.ArgonType.Argon2id}).then(function (hash) {
 			makeJSONRequest('/api/auth/register', {'username': username.value, 'passwordHash': hash.encoded, 'salt': salt}, 'POST').then(function (response) {
 				if (response.success) {
-//					window.location.href = '/registered';
+					window.location.href = '/registered';
 				}
 			});
 		});
