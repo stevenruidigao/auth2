@@ -54,7 +54,7 @@ func main() {
 
 	webAuthn, err = webauthn.New(&webauthn.Config{
 		RPDisplayName: "Authenticate",
-		RPID:          "authenticate.ands.ee",
+		RPID:          "localhost", //"authenticate.ands.ee",
 		RPOrigin:      "https://authenticate.ands.ee",
 		RPIcon:        "https://duo.com/logo.png",
 	})

@@ -1,7 +1,7 @@
 package database
 
 import (
-//	"encoding/binary"
+	//	"encoding/binary"
 	"time"
 
 	"github.com/duo-labs/webauthn/webauthn"
@@ -18,6 +18,7 @@ type User struct {
 	Success       bool
 	Token         string
 	TokenExpires  time.Time
+	WADisplayName string
 	WAIcon        string
 	WAID          []byte
 	WACredentials []webauthn.Credential
@@ -28,7 +29,8 @@ func (user *User) WebAuthnCredentials() []webauthn.Credential {
 }
 
 func (user *User) WebAuthnDisplayName() string {
-	return user.Name
+	return "New User"
+//	return user.Name
 }
 
 func (user *User) WebAuthnIcon() string {
@@ -37,7 +39,7 @@ func (user *User) WebAuthnIcon() string {
 
 func (user *User) WebAuthnID() []byte {
 	return []byte(user.ID)
-//	return user.WAID
+	//	return user.WAID
 }
 
 func (user *User) WebAuthnName() string {
