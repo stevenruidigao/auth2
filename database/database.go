@@ -13,7 +13,20 @@ func FindUser(user *User, database *mongo.Database) *User {
 	var result *User
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	cur := database.Collection("Users").FindOne(ctx, bson.M{"username": user.Username})
+	var cur *mongo.SingleResult
+
+	if user.Username != "" {
+		cur = database.Collection("Users").FindOne(ctx, bson.M{"username": user.Username})
+
+	} else if user.Token != "" {
+		cur = database.Collection("Users").FindOne(ctx, bson.M{"token": user.Token})
+
+	} else if user.ID != "" {
+		cur = database.Collection("Users").FindOne(ctx, bson.M{"token": user.ID})
+
+	} else {
+		return nil
+	}
 
 	if cur.Err() == mongo.ErrNoDocuments {
 		return nil

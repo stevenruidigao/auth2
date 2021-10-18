@@ -2,10 +2,12 @@ package utils
 
 import (
 	//	"crypto/rand"
+	"bytes"
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -70,4 +72,20 @@ func SHA512(str string) string {
 	hash := sha512.New()
 	hash.Write(StringToBytes(str))
 	return BytesToHexString(hash.Sum([]byte{}))
+}
+
+func ReadRequestBody(request *http.Request) []byte {
+	var body []byte
+
+	if request.Body != nil {
+		var err error
+		body, err = ioutil.ReadAll(request.Body)
+
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	request.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	return body
 }

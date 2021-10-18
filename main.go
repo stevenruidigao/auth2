@@ -55,7 +55,7 @@ func main() {
 	webAuthn, err = webauthn.New(&webauthn.Config{
 		RPDisplayName: "Authenticate",
 		RPID:          "localhost", //"authenticate.ands.ee",
-		RPOrigin:      "https://authenticate.ands.ee",
+		RPOrigin:      "",          //"https://authenticate.ands.ee",
 		RPIcon:        "https://duo.com/logo.png",
 	})
 
@@ -70,14 +70,15 @@ func main() {
 	}
 
 	router := mux.NewRouter()
-	//	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter := mux.NewRouter().PathPrefix("/api").Subrouter()
+	router.PathPrefix("/api").Handler(Limit(apiRouter))
 	authRouter := apiRouter.PathPrefix("/auth").Subrouter()
 	authRouter.Path("/login").Methods(http.MethodPost).HandlerFunc(Login)
 	authRouter.Path("/register").Methods(http.MethodPost).HandlerFunc(Register)
-	authRouter.Path("/register/webauthn/begin").Methods(http.MethodPost).HandlerFunc(BeginWebauthnRegistration)
+	registerWebauthnRouter := authRouter.PathPrefix("/register/webauthn").Subrouter()
+	registerWebauthnRouter.Path("/begin").Methods(http.MethodPost).HandlerFunc(BeginWebauthnRegistration)
+	registerWebauthnRouter.Path("/finish").Methods(http.MethodPost).HandlerFunc(FinishWebauthnRegistration)
 	authRouter.Path("/salt").Methods(http.MethodPost).HandlerFunc(Salt)
-	router.PathPrefix("/api").Handler(Limit(apiRouter))
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./static")))
 
 	go CleanUpVisitors()
@@ -195,7 +196,16 @@ func Salt(writer http.ResponseWriter, request *http.Request) {
 }
 
 func Authenticate(request *http.Request) *database.User {
-	result := database.FindUser(&database.User{Token: request.Header.Get("Bearer")}, userDatabase)
+	auth, err := request.Cookie("token")
+
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+
+	fmt.Println(auth.Value)
+	result := database.FindUser(&database.User{Token: auth.Value}, userDatabase)
+	// result := database.FindUser(&database.User{Token: request.Header.Get("Bearer")}, userDatabase)
 
 	if result == nil {
 		return nil
@@ -205,12 +215,20 @@ func Authenticate(request *http.Request) *database.User {
 }
 
 func BeginWebauthnRegistration(writer http.ResponseWriter, request *http.Request) {
-	var user database.User
+	user := Authenticate(request)
+	/*var user database.User
 	json.NewDecoder(request.Body).Decode(&user)
-	result := database.FindUser(&database.User{Username: user.Username}, userDatabase)
+	result := database.FindUser(&database.User{Username: user.Username}, userDatabase)*/
+	result := user //database.FindUser(&database.User{ID: user.ID}, userDatabase)
 
-	if result == nil {
+	/*if result == nil {
 		utils.JSONResponse(writer, Message{Success: false, Message: "That user couldn't be found."}, http.StatusInternalServerError)
+		return
+	}*/
+
+	if user == nil {
+		fmt.Println(user)
+		utils.JSONResponse(writer, Message{Success: false, Message: "You need to log in first."}, http.StatusUnauthorized)
 		return
 	}
 
@@ -230,6 +248,56 @@ func BeginWebauthnRegistration(writer http.ResponseWriter, request *http.Request
 	}
 
 	utils.JSONResponse(writer, options, http.StatusOK)
+}
+
+func FinishWebauthnRegistration(writer http.ResponseWriter, request *http.Request) {
+	user := Authenticate(request)
+	/*var user database.User
+	bytes := utils.ReadRequestBody(request)
+	json.Unmarshal(bytes, &user)
+	result := database.FindUser(&database.User{Username: user.Username}, userDatabase)*/
+	result := user //database.FindUser(&database.User{ID: user.ID}, userDatabase)
+
+	/*if result == nil {
+		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusBadRequest)
+		return
+	}
+
+	authenticated := Authenticate(request)
+
+	if authenticated == nil || result.ID != authenticated.ID {
+		fmt.Println(authenticated, result)
+		utils.JSONResponse(writer, Message{Success: false, Message: "You need to log in first."}, http.StatusUnauthorized)
+		return
+	}*/
+
+	if user == nil {
+		fmt.Println(user)
+		utils.JSONResponse(writer, Message{Success: false, Message: "You need to log in first."}, http.StatusUnauthorized)
+		return
+	}
+
+	// load the session data
+	sessionData, err := sessionStore.GetWebauthnSession("registration", request)
+
+	if err != nil {
+		fmt.Println(err)
+		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusBadRequest)
+		return
+	}
+
+	credential, err := webAuthn.FinishRegistration(result, sessionData, request)
+
+	if err != nil {
+		fmt.Println(err)
+		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusBadRequest)
+		return
+	}
+
+	result.WACredentials = append(result.WACredentials, *credential)
+	database.UpdateUser(result, userDatabase)
+	utils.JSONResponse(writer, Message{Success: true, Message: "Webauthn credential successfully registered."}, http.StatusOK)
+	return
 }
 
 func GetLimiter(hash string) *rate.Limiter {

@@ -107,25 +107,48 @@ function bufferToBase64String(buffer) {
 }
 
 function bufferDecode(value) {
-    return Uint8Array.from(atob(value), c => c.charCodeAt(0));
+	return Uint8Array.from(atob(value), c => c.charCodeAt(0));
 }
 
 function registerWebauthn() {
-	username = 'test'
+	makeJSONRequest('/api/auth/register/webauthn/begin', {
+//		username: username,
 
-	if (username === '') {
-		alert('Please enter a username');
-		return;
-	}
-
-	makeJSONRequest('/api/auth/register/webauthn/begin', {username: username}, 'POST').then((credentialCreationOptions) => {
+	}, 'POST').then((credentialCreationOptions) => {
 		credentialCreationOptions.publicKey.challenge = bufferDecode(credentialCreationOptions.publicKey.challenge);
 		credentialCreationOptions.publicKey.user.id = bufferDecode(credentialCreationOptions.publicKey.user.id);
 
 		return navigator.credentials.create({
 			publicKey: credentialCreationOptions.publicKey
 		});
+
 	}).then((credential) => {
-		// TODO
+		attestationObject = credential.response.attestationObject;
+		clientDataJSON = credential.response.clientDataJSON;
+		rawId = credential.rawId;
+
+		return makeJSONRequest('/api/auth/register/webauthn/finish', {
+//			username: username,
+			id: credential.id,
+			rawId: bufferEncode(rawId),
+			type: credential.type,
+			response: {
+				attestationObject: bufferEncode(attestationObject),
+				clientDataJSON: bufferEncode(clientDataJSON),
+			},
+
+		}, 'POST')
+
+	}).then((success) => {
+		alert("successfully registered!")
+		return
+
+	}).catch((error) => {
+		console.log(error)
+		alert("failed to register.")
 	});
+}
+
+function bufferEncode(value) {
+	return btoa(String.fromCharCode.apply(null, new Uint8Array(value))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");;
 }

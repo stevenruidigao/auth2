@@ -54,9 +54,11 @@ func NewStore(keyPairs ...[]byte) (*Store, error) {
 	// Generate a default encryption key if one isn't provided
 	if len(keyPairs) == 0 {
 		key, err := GenerateSecureKey(DefaultEncryptionKeyLength)
+
 		if err != nil {
 			return nil, err
 		}
+
 		keyPairs = append(keyPairs, key)
 	}
 
@@ -69,21 +71,22 @@ func NewStore(keyPairs ...[]byte) (*Store, error) {
 
 // SaveWebauthnSession marhsals and saves the webauthn data to the provided
 // key given the request and responsewriter
-func (store *Store) SaveWebauthnSession(key string, data *webauthn.SessionData, r *http.Request, w http.ResponseWriter) error {
+func (store *Store) SaveWebauthnSession(key string, data *webauthn.SessionData, request *http.Request, writer http.ResponseWriter) error {
 	marshaledData, err := json.Marshal(data)
 
 	if err != nil {
 		return err
 	}
 
-	return store.Set(key, marshaledData, r, w)
+	return store.Set(key, marshaledData, request, writer)
 }
 
 // GetWebauthnSession unmarshals and returns the webauthn session information
 // from the session cookie.
-func (store *Store) GetWebauthnSession(key string, r *http.Request) (webauthn.SessionData, error) {
+func (store *Store) GetWebauthnSession(key string, request *http.Request) (webauthn.SessionData, error) {
 	sessionData := webauthn.SessionData{}
-	session, err := store.Get(r, WebauthnSession)
+	session, err := store.Get(request, WebauthnSession)
+        fmt.Println(session);
 
 	if err != nil {
 		return sessionData, err
@@ -107,14 +110,15 @@ func (store *Store) GetWebauthnSession(key string, r *http.Request) (webauthn.Se
 }
 
 // Set stores a value to the session with the provided key.
-func (store *Store) Set(key string, value interface{}, r *http.Request, w http.ResponseWriter) error {
-	session, err := store.Get(r, WebauthnSession)
+func (store *Store) Set(key string, value interface{}, request *http.Request, writer http.ResponseWriter) error {
+	session, err := store.Get(request, WebauthnSession)
+        fmt.Println(session);
 
 	if err != nil {
 		fmt.Println("Error getting session %s", err)
 	}
 
 	session.Values[key] = value
-	session.Save(r, w)
+	session.Save(request, writer)
 	return nil
 }
