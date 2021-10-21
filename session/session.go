@@ -86,7 +86,7 @@ func (store *Store) SaveWebauthnSession(key string, data *webauthn.SessionData, 
 func (store *Store) GetWebauthnSession(key string, request *http.Request) (webauthn.SessionData, error) {
 	sessionData := webauthn.SessionData{}
 	session, err := store.Get(request, WebauthnSession)
-        fmt.Println(session);
+	fmt.Println(session)
 
 	if err != nil {
 		return sessionData, err
@@ -112,7 +112,7 @@ func (store *Store) GetWebauthnSession(key string, request *http.Request) (webau
 // Set stores a value to the session with the provided key.
 func (store *Store) Set(key string, value interface{}, request *http.Request, writer http.ResponseWriter) error {
 	session, err := store.Get(request, WebauthnSession)
-        fmt.Println(session);
+	fmt.Println(session)
 
 	if err != nil {
 		fmt.Println("Error getting session %s", err)

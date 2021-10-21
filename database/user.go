@@ -7,10 +7,17 @@ import (
 	"github.com/duo-labs/webauthn/webauthn"
 )
 
+type MFAOptions struct {
+	TOTP     bool
+	Webauthn bool
+}
+
 type User struct {
+	Data          string
 	ID            string
 	Name          string
 	Username      string
+	Enabled       MFAOptions
 	Email         string
 	PhoneNumber   string
 	PasswordHash  string
@@ -18,6 +25,9 @@ type User struct {
 	Success       bool
 	Token         string
 	TokenExpires  time.Time
+	Required      int
+	TOTP          string
+	TOTPSecret    string
 	WADisplayName string
 	WAIcon        string
 	WAID          []byte
@@ -29,8 +39,9 @@ func (user *User) WebAuthnCredentials() []webauthn.Credential {
 }
 
 func (user *User) WebAuthnDisplayName() string {
-	return "New User"
-//	return user.Name
+//	return "New User"
+	//	return user.Name
+		return user.Username
 }
 
 func (user *User) WebAuthnIcon() string {

@@ -15,6 +15,7 @@ import (
 	"github.com/duo-labs/webauthn/webauthn"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/pquerna/otp/totp"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -25,9 +26,17 @@ import (
 	"authenticate/utils"
 )
 
+type MFAData struct {
+	Enabled  database.MFAOptions `json:"enabled"`
+	Required int                 `json:"required"`
+	Webauthn string              `json:"webauthn"`
+	TOTP     string              `json:"totp"`
+}
+
 type Message struct {
-	Success bool   `json:"success"`
+	Data    string `json:"data"`
 	Message string `json:"message"`
+	Success bool   `json:"success"`
 }
 
 type Visitor struct {
@@ -110,8 +119,11 @@ func main() {
 }
 
 func Login(writer http.ResponseWriter, request *http.Request) {
+	valid := 0
+	bytes := utils.ReadRequestBody(request)
 	var credentials database.User
-	err := json.NewDecoder(request.Body).Decode(&credentials)
+	err := json.Unmarshal(bytes, &credentials)
+	// err := json.NewDecoder(request.Body).Decode(&credentials)
 
 	if err != nil {
 		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusOK)
@@ -122,32 +134,111 @@ func Login(writer http.ResponseWriter, request *http.Request) {
 
 	if user == nil {
 		utils.JSONResponse(writer, Message{Success: false, Message: "That user couldn't be found."}, http.StatusUnauthorized)
+		return
 
 	} else if !user.Success {
 		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
+		return
 
-	} else {
+	} else if credentials.PasswordHash != "" {
 		credentials.PasswordHash = utils.Argon2(credentials.PasswordHash, user.Salt)
 
 		if credentials.PasswordHash != user.PasswordHash {
 			utils.JSONResponse(writer, Message{Success: false, Message: "That password was incorrect."}, http.StatusUnauthorized)
+			return
 
 		} else {
-			authenticated := Authenticate(request)
-
-			if time.Since(user.TokenExpires) > 0 {
-				user.Token = uuid.NewString()
-				user.TokenExpires = time.Now().Add(24 * time.Hour)
-				database.UpdateUser(user, userDatabase)
-				utils.AddCookie(writer, "token", user.Token, time.Until(user.TokenExpires))
-
-			} else if authenticated == nil || authenticated.ID != user.ID {
-				utils.AddCookie(writer, "token", user.Token, time.Until(user.TokenExpires))
-			}
-
-			utils.JSONResponse(writer, Message{Success: true, Message: "You logged in successfully."}, http.StatusOK)
+			valid++
 		}
 	}
+
+	if credentials.TOTP != "" {
+		if totp.Validate(credentials.TOTP, user.TOTPSecret) {
+			valid++
+		}
+	}
+
+	sessionData, err := sessionStore.GetWebauthnSession("authentication", request)
+
+	fmt.Println("auth")
+
+	if err != nil {
+		fmt.Println(err)
+		//	utils.JSONResponse(writer, err.Error(), http.StatusBadRequest)
+		//	return
+
+	} else {
+		// in an actual implementation we should perform additional
+		// checks on the returned 'credential'
+
+		_, err = webAuthn.FinishLogin(user, sessionData, request)
+
+		if err != nil {
+			fmt.Println(err)
+			//	utils.JSONResponse(writer, err.Error(), http.StatusBadRequest)
+
+		} else {
+			valid++
+		}
+	}
+
+	fmt.Println("auth2", valid, user.Required)
+	if valid >= user.Required {
+		authenticated := Authenticate(request)
+
+		if time.Since(user.TokenExpires) > 0 {
+			user.Token = uuid.NewString()
+			user.TokenExpires = time.Now().Add(24 * time.Hour)
+			database.UpdateUser(user, userDatabase)
+			utils.AddCookie(writer, "token", user.Token, time.Until(user.TokenExpires))
+
+		} else if authenticated == nil || authenticated.ID != user.ID {
+			utils.AddCookie(writer, "token", user.Token, time.Until(user.TokenExpires))
+		}
+
+		utils.JSONResponse(writer, Message{Success: true, Message: "You logged in successfully."}, http.StatusOK)
+
+	} else if user.Enabled.Webauthn {
+		options, sessionData, err := webAuthn.BeginLogin(user)
+
+		if err != nil {
+			fmt.Println(err)
+			utils.JSONResponse(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// store session data as marshaled JSON
+		err = sessionStore.SaveWebauthnSession("authentication", sessionData, request, writer)
+
+		if err != nil {
+			fmt.Println(err)
+			utils.JSONResponse(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		jsonOptions, err := json.Marshal(options)
+
+		if err != nil {
+			fmt.Println(err)
+			utils.JSONResponse(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		jsonMFAData, err := json.Marshal(MFAData{Enabled: user.Enabled, Required: user.Required, Webauthn: string(jsonOptions)})
+
+		if err != nil {
+			fmt.Println(err)
+			utils.JSONResponse(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		utils.JSONResponse(writer, Message{Success: false, Message: "MFA Required.", Data: string(jsonMFAData)}, http.StatusForbidden)
+
+	} else {
+		utils.JSONResponse(writer, Message{Success: false, Message: "MFA Required."}, http.StatusForbidden)
+	}
+
+	fmt.Println(user.Enabled)
 }
 
 func Register(writer http.ResponseWriter, request *http.Request) {
@@ -261,7 +352,7 @@ func FinishWebauthnRegistration(writer http.ResponseWriter, request *http.Reques
 	/*if result == nil {
 		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusBadRequest)
 		return
-	}
+	}A
 
 	authenticated := Authenticate(request)
 
@@ -295,6 +386,7 @@ func FinishWebauthnRegistration(writer http.ResponseWriter, request *http.Reques
 	}
 
 	result.WACredentials = append(result.WACredentials, *credential)
+	user.Enabled.Webauthn = true
 	database.UpdateUser(result, userDatabase)
 	utils.JSONResponse(writer, Message{Success: true, Message: "Webauthn credential successfully registered."}, http.StatusOK)
 	return

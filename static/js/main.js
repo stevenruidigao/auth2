@@ -28,7 +28,59 @@ function login() {
 						response = JSON.parse(request.response);
 
 						if (response.success) {
+							window.history.replaceState({}, 'Logged in', '/logged_in');
 //							window.location.href = '/logged_in';
+
+						} else if (response.data !== '') {
+							data = JSON.parse(response.data);
+							console.log(data);
+
+							if (data.webauthn !== '') {
+								webauthn = JSON.parse(data.webauthn);
+								console.log(webauthn);
+
+								webauthn.publicKey.challenge = bufferDecode(webauthn.publicKey.challenge);
+
+								webauthn.publicKey.allowCredentials.forEach(function (listItem) {
+									listItem.id = bufferDecode(listItem.id)
+								});
+
+								navigator.credentials.get({
+									publicKey: webauthn.publicKey
+
+								}).then((assertion) => {
+									let authData = assertion.response.authenticatorData;
+									let clientDataJSON = assertion.response.clientDataJSON;
+									let rawId = assertion.rawId;
+									let sig = assertion.response.signature;
+									let userHandle = assertion.response.userHandle;
+
+									request = new XMLHttpRequest();
+									request.open('POST', '/api/auth/login', true);
+									request.send(JSON.stringify({
+										username: username.value,
+										passwordHash: hash.encoded,
+										id: assertion.id,
+										rawId: bufferEncode(rawId),
+										type: assertion.type,
+										response: {
+											authenticatorData: bufferEncode(authData),
+											clientDataJSON: bufferEncode(clientDataJSON),
+											signature: bufferEncode(sig),
+											userHandle: bufferEncode(userHandle),
+										},
+									}));
+
+									request.addEventListener('load', function () {
+										response = JSON.parse(request.response);
+
+										if (response.success) {
+											window.history.replaceState({}, 'Logged in', '/logged_in');
+//											window.location.href = '/logged_in';
+										}
+									});
+								});
+							}
 						}
 					});
 				});
@@ -140,15 +192,15 @@ function registerWebauthn() {
 		}, 'POST')
 
 	}).then((success) => {
-		alert("successfully registered!")
+		alert('successfully registered!')
 		return
 
 	}).catch((error) => {
 		console.log(error)
-		alert("failed to register.")
+		alert('failed to register.')
 	});
 }
 
 function bufferEncode(value) {
-	return btoa(String.fromCharCode.apply(null, new Uint8Array(value))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");;
+	return btoa(String.fromCharCode.apply(null, new Uint8Array(value))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');;
 }
