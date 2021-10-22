@@ -66,8 +66,8 @@ func main() {
 
 	webAuthn, err = webauthn.New(&webauthn.Config{
 		RPDisplayName: "Authenticate",
-		RPID:          "localhost", //"authenticate.ands.ee",
-		RPOrigin:      "",          //"https://authenticate.ands.ee",
+		RPID:          "authenticate.ands.ee",
+		RPOrigin:      "https://authenticate.ands.ee",
 		RPIcon:        "https://duo.com/logo.png",
 	})
 
@@ -368,6 +368,7 @@ func RegisterTOTP(writer http.ResponseWriter, request *http.Request) {
 	utils.JSONResponse(writer, Message{Success: true, Message: "Your TOTP key was generated.", Data: key.Secret()}, http.StatusInternalServerError)
 	fmt.Println(key, key.Secret(), image)
 	user.Enabled.TOTP = true
+	user.Required = 2
 	user.TOTPSecret = key.Secret()
 	database.UpdateUser(user, userDatabase)
 }
@@ -458,6 +459,7 @@ func FinishWebauthnRegistration(writer http.ResponseWriter, request *http.Reques
 
 	result.WACredentials = append(result.WACredentials, *credential)
 	user.Enabled.Webauthn = true
+	user.Required = 2
 	database.UpdateUser(result, userDatabase)
 	utils.JSONResponse(writer, Message{Success: true, Message: "Webauthn credential successfully registered."}, http.StatusOK)
 	return

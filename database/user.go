@@ -70,5 +70,5 @@ func (user *User) WebAuthnID() []byte {
 }
 
 func (user *User) WebAuthnName() string {
-	return user.Name
+	return user.Username
 }

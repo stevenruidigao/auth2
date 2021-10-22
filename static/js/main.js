@@ -123,7 +123,7 @@ function register() {
 		argon2.hash({pass: password.value, salt: salt, time: 20, type:argon2.ArgonType.Argon2id}).then(function (hash) {
 			makeJSONRequest('/api/auth/register', {'username': username.value, 'passwordHash': hash.encoded, 'salt': salt}, 'POST').then(function (response) {
 				if (response.success) {
-					window.location.href = '/registered';
+					window.history.replaceState({}, 'Registered', '/registered');
 				}
 			});
 		});
