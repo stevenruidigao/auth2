@@ -4,6 +4,7 @@ import (
 	//	"encoding/binary"
 	"time"
 
+	"github.com/duo-labs/webauthn/protocol"
 	"github.com/duo-labs/webauthn/webauthn"
 )
 
@@ -32,6 +33,21 @@ type User struct {
 	WAIcon        string
 	WAID          []byte
 	WACredentials []webauthn.Credential
+}
+
+func (user User) CredentialExcludeList() []protocol.CredentialDescriptor {
+	credentialExcludeList := []protocol.CredentialDescriptor{}
+
+	for _, cred := range user.WACredentials {
+		descriptor := protocol.CredentialDescriptor{
+			Type:         protocol.PublicKeyCredentialType,
+			CredentialID: cred.ID,
+		}
+
+		credentialExcludeList = append(credentialExcludeList, descriptor)
+	}
+
+	return credentialExcludeList
 }
 
 func (user *User) WebAuthnCredentials() []webauthn.Credential {

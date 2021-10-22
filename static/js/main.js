@@ -170,6 +170,12 @@ function registerWebauthn() {
 		credentialCreationOptions.publicKey.challenge = bufferDecode(credentialCreationOptions.publicKey.challenge);
 		credentialCreationOptions.publicKey.user.id = bufferDecode(credentialCreationOptions.publicKey.user.id);
 
+		if (credentialCreationOptions.publicKey.excludeCredentials) {
+			for (var i = 0; i < credentialCreationOptions.publicKey.excludeCredentials.length; i++) {
+				credentialCreationOptions.publicKey.excludeCredentials[i].id = bufferDecode(credentialCreationOptions.publicKey.excludeCredentials[i].id);
+			}
+		}
+
 		return navigator.credentials.create({
 			publicKey: credentialCreationOptions.publicKey
 		});

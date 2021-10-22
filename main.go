@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"image/png"
 	"net"
 	"net/http"
 	"strconv"
@@ -12,6 +14,7 @@ import (
 
 	"golang.org/x/time/rate"
 
+	"github.com/duo-labs/webauthn/protocol"
 	"github.com/duo-labs/webauthn/webauthn"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -84,6 +87,7 @@ func main() {
 	authRouter := apiRouter.PathPrefix("/auth").Subrouter()
 	authRouter.Path("/login").Methods(http.MethodPost).HandlerFunc(Login)
 	authRouter.Path("/register").Methods(http.MethodPost).HandlerFunc(Register)
+	authRouter.Path("/register/totp").Methods(http.MethodPost).HandlerFunc(RegisterTOTP)
 	registerWebauthnRouter := authRouter.PathPrefix("/register/webauthn").Subrouter()
 	registerWebauthnRouter.Path("/begin").Methods(http.MethodPost).HandlerFunc(BeginWebauthnRegistration)
 	registerWebauthnRouter.Path("/finish").Methods(http.MethodPost).HandlerFunc(FinishWebauthnRegistration)
@@ -120,9 +124,9 @@ func main() {
 
 func Login(writer http.ResponseWriter, request *http.Request) {
 	valid := 0
-	bytes := utils.ReadRequestBody(request)
+	body := utils.ReadRequestBody(request)
 	var credentials database.User
-	err := json.Unmarshal(bytes, &credentials)
+	err := json.Unmarshal(body, &credentials)
 	// err := json.NewDecoder(request.Body).Decode(&credentials)
 
 	if err != nil {
@@ -171,18 +175,36 @@ func Login(writer http.ResponseWriter, request *http.Request) {
 		// in an actual implementation we should perform additional
 		// checks on the returned 'credential'
 
-		_, err = webAuthn.FinishLogin(user, sessionData, request)
+		credential, err := webAuthn.FinishLogin(user, sessionData, request)
 
 		if err != nil {
 			fmt.Println(err)
 			//	utils.JSONResponse(writer, err.Error(), http.StatusBadRequest)
 
 		} else {
+			if credential.Authenticator.CloneWarning {
+				fmt.Println("credential appears to be cloned: %s", err)
+				utils.JSONResponse(writer, "", http.StatusForbidden)
+				return
+			}
+
+			var i int
+
+			for i = range user.WACredentials {
+				if bytes.Equal(user.WACredentials[i].ID, credential.ID) {
+					fmt.Println("*", i)
+					break
+				}
+			}
+
+			user.WACredentials[i].Authenticator.SignCount = credential.Authenticator.SignCount
+			database.UpdateUser(user, userDatabase)
 			valid++
 		}
 	}
 
 	fmt.Println("auth2", valid, user.Required)
+
 	if valid >= user.Required {
 		authenticated := Authenticate(request)
 
@@ -305,12 +327,57 @@ func Authenticate(request *http.Request) *database.User {
 	return result
 }
 
+func RegisterTOTP(writer http.ResponseWriter, request *http.Request) {
+	user := Authenticate(request)
+
+	if user == nil {
+		utils.JSONResponse(writer, Message{Success: false, Message: "You need to log in first."}, http.StatusUnauthorized)
+		return
+	}
+
+	if user.TOTPSecret != "" {
+		utils.JSONResponse(writer, Message{Success: false, Message: "You already have TOTP enabled."}, http.StatusUnauthorized)
+		return
+	}
+
+	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Authenticate", AccountName: user.Username})
+
+	if err != nil {
+		fmt.Println(err)
+		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
+		return
+	}
+
+	image, err := key.Image(512, 512)
+
+	if err != nil {
+		fmt.Println(err)
+		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
+		return
+	}
+
+	var buf bytes.Buffer
+	png.Encode(&buf, image)
+
+	if err != nil {
+		fmt.Println(err)
+		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
+		return
+	}
+
+	utils.JSONResponse(writer, Message{Success: true, Message: "Your TOTP key was generated.", Data: key.Secret()}, http.StatusInternalServerError)
+	fmt.Println(key, key.Secret(), image)
+	user.Enabled.TOTP = true
+	user.TOTPSecret = key.Secret()
+	database.UpdateUser(user, userDatabase)
+}
+
 func BeginWebauthnRegistration(writer http.ResponseWriter, request *http.Request) {
 	user := Authenticate(request)
 	/*var user database.User
 	json.NewDecoder(request.Body).Decode(&user)
 	result := database.FindUser(&database.User{Username: user.Username}, userDatabase)*/
-	result := user //database.FindUser(&database.User{ID: user.ID}, userDatabase)
+	// result := user //database.FindUser(&database.User{ID: user.ID}, userDatabase)
 
 	/*if result == nil {
 		utils.JSONResponse(writer, Message{Success: false, Message: "That user couldn't be found."}, http.StatusInternalServerError)
@@ -323,7 +390,11 @@ func BeginWebauthnRegistration(writer http.ResponseWriter, request *http.Request
 		return
 	}
 
-	options, sessionData, err := webAuthn.BeginRegistration(result)
+	registerOptions := func(credentialCreationOptions *protocol.PublicKeyCredentialCreationOptions) {
+		credentialCreationOptions.CredentialExcludeList = user.CredentialExcludeList()
+	}
+
+	options, sessionData, err := webAuthn.BeginRegistration(user, registerOptions)
 
 	if err != nil {
 		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
