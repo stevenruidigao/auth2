@@ -209,12 +209,12 @@ func Login(writer http.ResponseWriter, request *http.Request) {
 	fmt.Println("auth2", valid, user.Required)
 
 	if valid >= user.Required {
-		authenticated := Authenticate(request)
+		authenticated, token := Authenticate(request)
 
-		if time.Since(user.TokenExpires) > 0 {
+		if token == nil || time.Since(token.TokenExpires) > 0 {
 			user.Token = uuid.NewString()
 			user.TokenExpires = time.Now().Add(24 * time.Hour)
-			// user.Tokens
+			user.Tokens = append(user.Tokens, database.Token{TokenHash: utils.SHA512(user.Token), TokenExpires: user.TokenExpires})
 			database.UpdateUser(user, userDatabase)
 			utils.AddCookie(writer, "token", user.Token, time.Until(user.TokenExpires))
 
@@ -313,12 +313,12 @@ func Salt(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
-func Authenticate(request *http.Request) *database.User {
+func Authenticate(request *http.Request) (*database.User, *database.Token) {
 	auth, err := request.Cookie("token")
 
 	if err != nil {
 		fmt.Println(err)
-		return nil
+		return nil, nil
 	}
 
 	fmt.Println(auth.Value)
@@ -326,14 +326,30 @@ func Authenticate(request *http.Request) *database.User {
 	// result := database.FindUser(&database.User{Token: request.Header.Get("Bearer")}, userDatabase)
 
 	if user == nil {
-		return nil
+		return nil, nil
 	}
 
-	return user
+	var token *database.Token
+
+	for _, token := range user.Tokens {
+		/*if token == nil || time.Since(token.TokenExpires) > 0 {
+		user.Token = uuid.NewString()
+		user.TokenExpires = time.Now().Add(24 * time.Hour)
+		user.Tokens = append(user.Tokens, database.Token{TokenHash: utils.SHA512(user.Token), TokenExpires: user.TokenExpires})
+		database.UpdateUser(user, userDatabase)
+		utils.AddCookie(writer, "token", user.Token, time.Until(user.TokenExpires))
+		*/
+
+		if token.TokenHash == utils.SHA512(auth.Value) {
+			break
+		}
+	}
+
+	return user, token
 }
 
 func RegisterTOTP(writer http.ResponseWriter, request *http.Request) {
-	user := Authenticate(request)
+	user, _ := Authenticate(request)
 
 	if user == nil {
 		utils.JSONResponse(writer, Message{Success: false, Message: "You need to log in first."}, http.StatusUnauthorized)
@@ -379,7 +395,7 @@ func RegisterTOTP(writer http.ResponseWriter, request *http.Request) {
 }
 
 func BeginWebauthnRegistration(writer http.ResponseWriter, request *http.Request) {
-	user := Authenticate(request)
+	user, _ := Authenticate(request)
 	/*var user database.User
 	json.NewDecoder(request.Body).Decode(&user)
 	result := database.FindUser(&database.User{Username: user.Username}, userDatabase)*/
@@ -419,7 +435,7 @@ func BeginWebauthnRegistration(writer http.ResponseWriter, request *http.Request
 }
 
 func FinishWebauthnRegistration(writer http.ResponseWriter, request *http.Request) {
-	user := Authenticate(request)
+	user, _ := Authenticate(request)
 	/*var user database.User
 	bytes := utils.ReadRequestBody(request)
 	json.Unmarshal(bytes, &user)
