@@ -73,7 +73,7 @@ input {
 }
 
 body, .background {
-	background: url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/80625/tree.jpg);
+	background: lightblue; /*url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/80625/tree.jpg);*/
 	background-attachment: fixed;
 	background-position: center;
 	background-repeat: no-repeat;
