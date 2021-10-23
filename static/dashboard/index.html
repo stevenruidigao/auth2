@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<link rel="stylesheet" href="/css/main.css" defer>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<script src="/js/argon2-browser/dist/argon2-bundled.min.js" defer></script>
+		<script src="/js/qrcode/build/qrcode.min.js"></script>
+		<script src="/js/main.js"></script>
+		<title>Dashboard</title>
+	</head>
+	<body>
+		<div class="centerfallback fixed background" hidden></div>
+		<div class="centerfallback center fixed prompt">
+			<p>You are logged in.</p>
+			<button onclick="registerTOTP()" type="button">Register TOTP!</button>
+			<button onclick="registerWebauthn()" type="button">Register Webauthn!</button>
+		</div>
+	</body>
+</html>

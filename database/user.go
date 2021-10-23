@@ -13,6 +13,11 @@ type MFAOptions struct {
 	Webauthn bool
 }
 
+type Token struct {
+	TokenHash    string
+	TokenExpires time.Time
+}
+
 type User struct {
 	Data          string
 	ID            string
@@ -25,6 +30,7 @@ type User struct {
 	Salt          string
 	Success       bool
 	Token         string
+	Tokens        []Token
 	TokenExpires  time.Time
 	Required      int
 	TOTP          string
@@ -55,9 +61,9 @@ func (user *User) WebAuthnCredentials() []webauthn.Credential {
 }
 
 func (user *User) WebAuthnDisplayName() string {
-//	return "New User"
+	//	return "New User"
 	//	return user.Name
-		return user.Username
+	return user.Username
 }
 
 func (user *User) WebAuthnIcon() string {

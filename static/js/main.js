@@ -9,6 +9,7 @@ function goRegister() {
 function login() {
 	username = document.getElementById('username');
 	password = document.getElementById('password');
+	totp = document.getElementById('totp');
 
 	if (username != null && password != null) {
 		request = new XMLHttpRequest();
@@ -22,14 +23,14 @@ function login() {
 				argon2.hash({pass: password.value, salt: response.message, time: 20, type:argon2.ArgonType.Argon2id}).then(function (hash) {
 					request = new XMLHttpRequest();
 					request.open('POST', '/api/auth/login', true);
-					request.send(JSON.stringify({'username': username.value, 'passwordHash': hash.encoded}));
+					request.send(JSON.stringify({'username': username.value, 'passwordHash': hash.encoded, 'totp': totp.value}));
 
 					request.addEventListener('load', function () {
 						response = JSON.parse(request.response);
 
 						if (response.success) {
-							window.history.replaceState({}, 'Logged in', '/logged_in');
-//							window.location.href = '/logged_in';
+//							window.history.replaceState({}, 'Logged in', '/logged_in');
+							window.location.href = '/dashboard';
 
 						} else if (response.data !== '') {
 							data = JSON.parse(response.data);
@@ -75,7 +76,8 @@ function login() {
 										response = JSON.parse(request.response);
 
 										if (response.success) {
-											window.history.replaceState({}, 'Logged in', '/logged_in');
+//											window.history.replaceState({}, 'Logged in', '/logged_in');
+											window.location.href = '/dashboard';
 //											window.location.href = '/logged_in';
 										}
 									});
@@ -123,7 +125,8 @@ function register() {
 		argon2.hash({pass: password.value, salt: salt, time: 20, type:argon2.ArgonType.Argon2id}).then(function (hash) {
 			makeJSONRequest('/api/auth/register', {'username': username.value, 'passwordHash': hash.encoded, 'salt': salt}, 'POST').then(function (response) {
 				if (response.success) {
-					window.history.replaceState({}, 'Registered', '/registered');
+					window.location.href = '/dashboard';
+//					window.history.replaceState({}, 'Registered', '/registered');
 				}
 			});
 		});
@@ -160,6 +163,21 @@ function bufferToBase64String(buffer) {
 
 function bufferDecode(value) {
 	return Uint8Array.from(atob(value), c => c.charCodeAt(0));
+}
+
+function registerTOTP() {
+	makeJSONRequest('/api/auth/register/totp', {}, 'POST').then((totpResponse) => {
+		image = document.createElement("img");
+
+		QRCode.toDataURL(totpResponse.data).then((uri)=>{
+			console.log(uri);
+			image.src=uri;
+			console.log(image);
+			document.body.appendChild(image)
+		});
+
+		console.log(totpResponse);
+	});
 }
 
 function registerWebauthn() {

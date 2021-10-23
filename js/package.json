@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "argon2-browser": "^1.18.0"
+    "argon2-browser": "^1.18.0",
+    "qrcode": "^1.4.4"
   }
 }

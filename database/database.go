@@ -18,11 +18,11 @@ func FindUser(user *User, database *mongo.Database) *User {
 	if user.Username != "" {
 		cur = database.Collection("Users").FindOne(ctx, bson.M{"username": user.Username})
 
+	} else if user.ID != "" {
+		cur = database.Collection("Users").FindOne(ctx, bson.M{"id": user.ID})
+
 	} else if user.Token != "" {
 		cur = database.Collection("Users").FindOne(ctx, bson.M{"token": user.Token})
-
-	} else if user.ID != "" {
-		cur = database.Collection("Users").FindOne(ctx, bson.M{"token": user.ID})
 
 	} else {
 		return nil

@@ -148,6 +148,7 @@ func Login(writer http.ResponseWriter, request *http.Request) {
 		credentials.PasswordHash = utils.Argon2(credentials.PasswordHash, user.Salt)
 
 		if credentials.PasswordHash != user.PasswordHash {
+			fmt.Println("Incorrect password")
 			utils.JSONResponse(writer, Message{Success: false, Message: "That password was incorrect."}, http.StatusUnauthorized)
 			return
 
@@ -155,6 +156,8 @@ func Login(writer http.ResponseWriter, request *http.Request) {
 			valid++
 		}
 	}
+
+	fmt.Println(credentials.TOTP)
 
 	if credentials.TOTP != "" {
 		if totp.Validate(credentials.TOTP, user.TOTPSecret) {
@@ -211,6 +214,7 @@ func Login(writer http.ResponseWriter, request *http.Request) {
 		if time.Since(user.TokenExpires) > 0 {
 			user.Token = uuid.NewString()
 			user.TokenExpires = time.Now().Add(24 * time.Hour)
+			// user.Tokens
 			database.UpdateUser(user, userDatabase)
 			utils.AddCookie(writer, "token", user.Token, time.Until(user.TokenExpires))
 
@@ -294,7 +298,7 @@ func Register(writer http.ResponseWriter, request *http.Request) {
 func Salt(writer http.ResponseWriter, request *http.Request) {
 	var user database.User
 	json.NewDecoder(request.Body).Decode(&user)
-	fmt.Println(user)
+	//fmt.Println(user)
 	result := database.FindUser(&database.User{Username: user.Username}, userDatabase)
 
 	if result == nil {
@@ -304,6 +308,7 @@ func Salt(writer http.ResponseWriter, request *http.Request) {
 		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
 
 	} else {
+		fmt.Println(result, result.Success)
 		utils.JSONResponse(writer, Message{Success: true, Message: result.Salt}, http.StatusOK)
 	}
 }
@@ -317,14 +322,14 @@ func Authenticate(request *http.Request) *database.User {
 	}
 
 	fmt.Println(auth.Value)
-	result := database.FindUser(&database.User{Token: auth.Value}, userDatabase)
+	user := database.FindUser(&database.User{Token: auth.Value}, userDatabase)
 	// result := database.FindUser(&database.User{Token: request.Header.Get("Bearer")}, userDatabase)
 
-	if result == nil {
+	if user == nil {
 		return nil
 	}
 
-	return result
+	return user
 }
 
 func RegisterTOTP(writer http.ResponseWriter, request *http.Request) {
@@ -340,7 +345,7 @@ func RegisterTOTP(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Authenticate", AccountName: user.Username})
+	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Authenticate.ands.ee", AccountName: user.Username})
 
 	if err != nil {
 		fmt.Println(err)
@@ -365,7 +370,7 @@ func RegisterTOTP(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	utils.JSONResponse(writer, Message{Success: true, Message: "Your TOTP key was generated.", Data: key.Secret()}, http.StatusInternalServerError)
+	utils.JSONResponse(writer, Message{Success: true, Message: "Your TOTP key was generated.", Data: key.URL()}, http.StatusOK)
 	fmt.Println(key, key.Secret(), image)
 	user.Enabled.TOTP = true
 	user.Required = 2
