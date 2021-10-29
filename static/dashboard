@@ -10,10 +10,11 @@
 	</head>
 	<body>
 		<div class="centerfallback fixed background" hidden></div>
-		<div class="centerfallback center fixed prompt">
+		<div class="centerfallback center fixed prompt" id="main">
 			<p>You are logged in.</p>
-			<button onclick="registerTOTP()" type="button">Register TOTP!</button>
-			<button onclick="registerWebauthn()" type="button">Register Webauthn!</button>
+			<button id="totp" type="button">Register TOTP!</button>
+			<button id="webauthn" type="button">Register Webauthn!</button>
 		</div>
+		<script src="/js/dashboard.js"></script>
 	</body>
 </html>

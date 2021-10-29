@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -162,7 +163,7 @@ func Salt(writer http.ResponseWriter, request *http.Request) {
 		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
 
 	} else {
-		fmt.Println(result, result.Success)
+		// fmt.Println(result, result.Success)
 		utils.JSONResponse(writer, Message{Success: true, Message: result.Salt}, http.StatusOK)
 	}
 }
@@ -175,7 +176,7 @@ func Authenticate(request *http.Request) (*database.User, *database.Token) {
 		return nil, nil
 	}
 
-	fmt.Println(auth.Value)
+	// fmt.Println(auth.Value)
 	user := database.FindUser(&database.User{Token: auth.Value}, userDatabase)
 	// result := database.FindUser(&database.User{Token: request.Header.Get("Bearer")}, userDatabase)
 
@@ -241,21 +242,21 @@ func RegisterTOTP(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	utils.JSONResponse(writer, Message{Success: true, Message: "Your TOTP key was generated.", Data: key.URL()}, http.StatusOK)
-	fmt.Println(key, key.Secret(), image)
+	// fmt.Println(key, key.Secret(), image)
 	user.Enabled.TOTP = true
 	user.Required = 2
 	user.TOTPSecret = key.Secret()
 	database.UpdateUser(user, userDatabase)
 }
 
-func GetLimiter(hash string) *rate.Limiter {
+func GetLimiter(hash string, requests rate.Limit, burst int) *rate.Limiter {
 	visitorsMutex.Lock()
 	defer visitorsMutex.Unlock()
 
 	visitor := visitors[hash]
 
 	if visitor == nil {
-		limiter := rate.NewLimiter(1, 5)
+		limiter := rate.NewLimiter(requests, burst)
 		visitors[hash] = &Visitor{limiter, time.Now()}
 		return limiter
 	}
@@ -266,17 +267,40 @@ func GetLimiter(hash string) *rate.Limiter {
 
 func Limit(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		ip, _, err := net.SplitHostPort(request.RemoteAddr)
+		XForwardedFor := strings.Split(request.Header.Get("X-Forwarded-For"), ", ")
+		ip := string(XForwardedFor[len(XForwardedFor)-1])
 
-		if err != nil {
-			fmt.Println(err)
-			utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
-			return
+		if ip == "" {
+			var err error
+			ip, _, err = net.SplitHostPort(request.RemoteAddr)
+
+			if err != nil {
+				fmt.Println(err)
+				utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
+				return
+			}
 		}
 
-		limiter := GetLimiter(utils.SHA512(ip))
+		auth, err := request.Cookie("token")
 
-		if limiter.Allow() == false {
+		if err != nil {
+			if err != http.ErrNoCookie {
+				fmt.Println(err)
+				return
+			}
+
+		} else {
+			userLimiter := GetLimiter(utils.SHA512(auth.Value), 1, 5)
+
+			if userLimiter.Allow() == false {
+				utils.JSONResponse(writer, Message{Success: false, Message: http.StatusText(429)}, http.StatusTooManyRequests)
+				return
+			}
+		}
+
+		IPLimiter := GetLimiter(utils.SHA512(ip), 5, 25)
+
+		if IPLimiter.Allow() == false {
 			utils.JSONResponse(writer, Message{Success: false, Message: http.StatusText(429)}, http.StatusTooManyRequests)
 			return
 		}

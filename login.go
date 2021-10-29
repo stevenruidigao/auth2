@@ -56,7 +56,7 @@ func Login(writer http.ResponseWriter, request *http.Request) {
 	sessionData, err := sessionStore.GetWebauthnSession("authentication", request)
 
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("123", err)
 		//      utils.JSONResponse(writer, err.Error(), http.StatusBadRequest)
 		//      return
 
@@ -67,12 +67,12 @@ func Login(writer http.ResponseWriter, request *http.Request) {
 		credential, err := webAuthn.FinishLogin(user, sessionData, request)
 
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("234", err)
 			//      utils.JSONResponse(writer, err.Error(), http.StatusBadRequest)
 
 		} else {
 			if credential.Authenticator.CloneWarning {
-				fmt.Println("credential appears to be cloned: %s", err)
+				// fmt.Println("Credential appears to be cloned: %s", err)
 				utils.JSONResponse(writer, Message{Success: false, Message: "Credential appears to be cloned."}, http.StatusForbidden)
 				return
 			}
@@ -81,7 +81,7 @@ func Login(writer http.ResponseWriter, request *http.Request) {
 
 			for i = range user.WACredentials {
 				if bytes.Equal(user.WACredentials[i].ID, credential.ID) {
-					fmt.Println("*", i)
+					// fmt.Println("i", i)
 					break
 				}
 			}
@@ -92,7 +92,7 @@ func Login(writer http.ResponseWriter, request *http.Request) {
 		}
 	}
 
-	fmt.Println("auth2", valid, user.Required)
+	// fmt.Println("auth2", valid, user.Required)
 
 	if valid >= user.Required {
 		authenticated, token := Authenticate(request)
@@ -114,7 +114,7 @@ func Login(writer http.ResponseWriter, request *http.Request) {
 		options, sessionData, err := webAuthn.BeginLogin(user)
 
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("345", err)
 			utils.JSONResponse(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -123,7 +123,7 @@ func Login(writer http.ResponseWriter, request *http.Request) {
 		err = sessionStore.SaveWebauthnSession("authentication", sessionData, request, writer)
 
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("456", err)
 			utils.JSONResponse(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -131,7 +131,7 @@ func Login(writer http.ResponseWriter, request *http.Request) {
 		jsonOptions, err := json.Marshal(options)
 
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("567", err)
 			utils.JSONResponse(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -139,7 +139,7 @@ func Login(writer http.ResponseWriter, request *http.Request) {
 		jsonMFAData, err := json.Marshal(MFAData{Enabled: user.Enabled, Required: user.Required, Webauthn: string(jsonOptions)})
 
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("678", err)
 			utils.JSONResponse(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}

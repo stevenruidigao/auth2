@@ -1,9 +1,9 @@
 module authenticate
 
-go 1.17
+go 1.15
 
 require (
-	github.com/duo-labs/webauthn v0.0.0-20190926021235-9562c88a0899
+	github.com/duo-labs/webauthn v0.0.0-20210727191636-9f1b88ef44cc
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/sessions v1.2.1

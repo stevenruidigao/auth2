@@ -13,7 +13,7 @@ import (
 
 // DefaultEncryptionKeyLength is the length of the generated encryption keys
 // used for session management.
-const DefaultEncryptionKeyLength = 32
+const DefaultEncryptionKeyLength = 64
 
 // WebauthnSession is the name of the session cookie used to manage session-
 // related information.
@@ -22,25 +22,25 @@ const WebauthnSession = "webauthn-session"
 // ErrInsufficientBytesRead is returned in the rare case that an unexpected
 // number of bytes are returned from the crypto/rand reader when creating
 // session cookie encryption keys.
-var ErrInsufficientBytesRead = errors.New("insufficient bytes read")
+var ErrInsufficientBytesRead = errors.New("Insufficient bytes read")
 
 // ErrMarshal is returned if unexpected data is present in a webauthn session.
-var ErrMarshal = errors.New("error unmarshaling data")
+var ErrMarshal = errors.New("Error unmarshaling data")
 
 // GenerateSecureKey reads and returns n bytes from the crypto/rand reader
-func GenerateSecureKey(n int) ([]byte, error) {
-	buf := make([]byte, n)
-	read, err := rand.Read(buf)
+func GenerateSecureKey(number int) ([]byte, error) {
+	buffer := make([]byte, number)
+	read, err := rand.Read(buffer)
 
 	if err != nil {
-		return buf, err
+		return buffer, err
 	}
 
-	if read != n {
-		return buf, ErrInsufficientBytesRead
+	if read != number {
+		return buffer, ErrInsufficientBytesRead
 	}
 
-	return buf, nil
+	return buffer, nil
 }
 
 // Store is a wrapper around sessions.CookieStore which provides some helper
@@ -86,7 +86,7 @@ func (store *Store) SaveWebauthnSession(key string, data *webauthn.SessionData, 
 func (store *Store) GetWebauthnSession(key string, request *http.Request) (webauthn.SessionData, error) {
 	sessionData := webauthn.SessionData{}
 	session, err := store.Get(request, WebauthnSession)
-	fmt.Println(session)
+	//fmt.Println(session)
 
 	if err != nil {
 		return sessionData, err
@@ -112,13 +112,13 @@ func (store *Store) GetWebauthnSession(key string, request *http.Request) (webau
 // Set stores a value to the session with the provided key.
 func (store *Store) Set(key string, value interface{}, request *http.Request, writer http.ResponseWriter) error {
 	session, err := store.Get(request, WebauthnSession)
-	fmt.Println(session)
+	//fmt.Println(session)
 
 	if err != nil {
-		fmt.Println("Error getting session %s", err)
+		fmt.Println("Error getting session", err)
 	}
 
 	session.Values[key] = value
 	session.Save(request, writer)
-	return nil
+	return err
 }

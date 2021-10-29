@@ -10,8 +10,8 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible h1:7qlOGliEKZXTDg6OTjfoBKDXWrumCAMpl/TFQ4/5kLM=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
-github.com/duo-labs/webauthn v0.0.0-20190926021235-9562c88a0899 h1:tRSuoCRGN1kP/s0rAijBdn5U2keE8JAVH7EsRKhEyHg=
-github.com/duo-labs/webauthn v0.0.0-20190926021235-9562c88a0899/go.mod h1:4G3LZJfcX9Si0YNLDryi64Bz5urtJubrPwlTIYoyiU4=
+github.com/duo-labs/webauthn v0.0.0-20191119193225-4bf9a0f776d4 h1:rXVUYM3uQcdXgSvQ5Bo+JZFMnLi0H3jib+2mz7B6M4U=
+github.com/duo-labs/webauthn v0.0.0-20191119193225-4bf9a0f776d4/go.mod h1:KR2KScxcZAWdZGOUnsPGjD3ow0cvNfv3WHXC/Xz+d9g=
 github.com/duo-labs/webauthn v0.0.0-20210727191636-9f1b88ef44cc h1:mLNknBMRNrYNf16wFFUyhSAe1tISZN7oAfal4CZ2OxY=
 github.com/duo-labs/webauthn v0.0.0-20210727191636-9f1b88ef44cc/go.mod h1:/X2OJiJxjQ7alqWZqX9EtBTmZc+4qQ0LvZ1k5wP67RM=
 github.com/fxamacker/cbor/v2 v2.2.0 h1:6eXqdDDe588rSYAi1HfZKbx6YYQO4mxQ9eC6xYpU/JQ=

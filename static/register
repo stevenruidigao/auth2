@@ -9,17 +9,16 @@
 	</head>
 	<body>
 		<div class="centerfallback fixed background"></div>
-		<div class="center fixed prompt">
+		<div class="center fixed prompt" id="main">
 			<p>Register:</p>
 			<div class="fullwidth">
 				<label for="username">Username:</label>
 				<input type="text" id="username" name="username" placeholder="Username" spellcheck="false">
-			</div>
-			<div class="fullwidth">
 				<label for="password">Password:</label>
 				<input type="password" id="password" name="password" placeholder="Password" spellcheck="false">
 			</div>
-			<button onclick="register()">Submit</button>
+			<button id="submit">Submit</button>
 		</div>
+		<script src="/js/register.js"></script>
 	</body>
 </html>

@@ -2,6 +2,7 @@
 <html lang="en">
 	<head>
 		<link rel="stylesheet" href="/css/main.css" defer>
+		<meta description="Log in to authenticate.ands.ee.">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<script src="/js/argon2-browser/dist/argon2-bundled.min.js" defer></script>
 		<script src="/js/main.js"></script>
@@ -9,19 +10,18 @@
 	</head>
 	<body>
 		<div class="centerfallback fixed background"></div>
-		<div class="centerfallback center fixed prompt">
+		<div class="centerfallback center fixed prompt" id="main">
 			<p>Log in:</p>
 			<div class="fullwidth">
 				<label for="username">Username:</label>
 				<input type="text" id="username" name="username" placeholder="Username" spellcheck="false">
-			</div>
-			<div class="fullwidth">
 				<label for="password">Password:</label>
 				<input type="password" id="password" name="password" placeholder="Password" spellcheck="false">
 			</div>
 			<label for="totp">TOTP:</label>
 			<input type="text" id="totp" name="totp" placeholder="TOTP" spellcheck="false">
-			<button onclick="login()">Submit</button>
+			<button id="submit">Submit</button>
 		</div>
+		<script src="/js/login.js"></script>
 	</body>
 </html>

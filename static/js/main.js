@@ -1,3 +1,50 @@
+function alertUser(div, type, message, time=5000) {
+	let alertDiv = document.createElement('div');
+	alertDiv.className = 'alert hidden ' + type;
+	p = document.createElement('p');
+	p.innerText = message;
+	alertDiv.appendChild(p);
+	alerts = document.getElementsByClassName('alert');
+
+	for (old of alerts) {
+		// old.remove();
+	}
+
+	alertDiv.opacity = 0;
+
+	if (alerts.length == 0) {
+		div.insertBefore(alertDiv, div.firstChild);
+
+	} else if (alerts.length >= 5) {
+		div.firstChild.remove();
+		div.firstChild.className = alertDiv.className.replace('hidden ', 'visible ');
+		div.insertBefore(alertDiv, alerts[alerts.length - 1].nextSibling);
+
+	} else {
+		div.insertBefore(alertDiv, alerts[alerts.length - 1].nextSibling);
+	}
+
+	setTimeout(function () {
+		alertDiv.className = alertDiv.className.replace('hidden ', 'visible ');
+	}, 0);
+
+	setTimeout(function () {
+		alertDiv.className = alertDiv.className.replace('visible ', 'hidden ');
+
+		setTimeout(function () {
+			alertDiv.remove();
+		}, 1000);
+	}, time);
+}
+
+function focusPassword(event) {
+	if (event && event.type !== 'click' && (event.type == 'keydown' && event.code !== 'Enter')) {
+		return;
+	}
+
+	document.getElementById('password').focus();
+}
+
 function goLogin() {
 	window.location.href = '/login';
 }
@@ -6,7 +53,11 @@ function goRegister() {
 	window.location.href = '/register';
 }
 
-function login() {
+function login(event) {
+	if (event && event.type !== 'click' && (event.type == 'keydown' && event.code !== 'Enter')) {
+		return;
+	}
+
 	username = document.getElementById('username');
 	password = document.getElementById('password');
 	totp = document.getElementById('totp');
@@ -19,74 +70,91 @@ function login() {
 		request.addEventListener('load', function () {
 			response = JSON.parse(request.response);
 
-			if (response.success) {
-				argon2.hash({pass: password.value, salt: response.message, time: 20, type:argon2.ArgonType.Argon2id}).then(function (hash) {
-					request = new XMLHttpRequest();
-					request.open('POST', '/api/auth/login', true);
-					request.send(JSON.stringify({'username': username.value, 'passwordHash': hash.encoded, 'totp': totp.value}));
+			if (!response.success) {
+				alertUser(document.getElementById('main'), 'failure', response.message);
+				return;
+			}
 
-					request.addEventListener('load', function () {
-						response = JSON.parse(request.response);
+			argon2.hash({pass: password.value, salt: response.message, time: 20, type:argon2.ArgonType.Argon2id}).then(function (hash) {
+				request = new XMLHttpRequest();
+				request.open('POST', '/api/auth/login', true);
+				request.send(JSON.stringify({'username': username.value, 'passwordHash': hash.encoded, 'totp': totp.value}));
 
-						if (response.success) {
-//							window.history.replaceState({}, 'Logged in', '/logged_in');
-							window.location.href = '/dashboard';
+				request.addEventListener('load', function () {
+					response = JSON.parse(request.response);
 
-						} else if (response.data !== '') {
-							data = JSON.parse(response.data);
-							console.log(data);
+					if (response.success) {
+						alertUser(document.getElementById('main'), 'success', response.message);
+						window.location.href = '/dashboard';
+//						window.history.replaceState({}, 'Logged in', '/logged_in');
+						return;
 
-							if (data.webauthn !== '') {
-								webauthn = JSON.parse(data.webauthn);
-								console.log(webauthn);
+					} else if (response.data === '') {
+						alertUser(document.getElementById('main'), 'failure', response.message);
+						return
+					}
 
-								webauthn.publicKey.challenge = bufferDecode(webauthn.publicKey.challenge);
+					data = JSON.parse(response.data);
+					console.log(data);
 
-								webauthn.publicKey.allowCredentials.forEach(function (listItem) {
-									listItem.id = bufferDecode(listItem.id)
-								});
+					if (data.webauthn === '') {
+						alertUser(document.getElementById('main'), 'failure', response.message);
+						return;
+					}
 
-								navigator.credentials.get({
-									publicKey: webauthn.publicKey
+					webauthn = JSON.parse(data.webauthn);
+					console.log(webauthn);
 
-								}).then((assertion) => {
-									let authData = assertion.response.authenticatorData;
-									let clientDataJSON = assertion.response.clientDataJSON;
-									let rawId = assertion.rawId;
-									let sig = assertion.response.signature;
-									let userHandle = assertion.response.userHandle;
+					webauthn.publicKey.challenge = bufferDecode(webauthn.publicKey.challenge);
 
-									request = new XMLHttpRequest();
-									request.open('POST', '/api/auth/login', true);
-									request.send(JSON.stringify({
-										username: username.value,
-										passwordHash: hash.encoded,
-										id: assertion.id,
-										rawId: bufferEncode(rawId),
-										type: assertion.type,
-										response: {
-											authenticatorData: bufferEncode(authData),
-											clientDataJSON: bufferEncode(clientDataJSON),
-											signature: bufferEncode(sig),
-											userHandle: bufferEncode(userHandle),
-										},
-									}));
+					webauthn.publicKey.allowCredentials.forEach(function (listItem) {
+						listItem.id = bufferDecode(listItem.id)
+					});
 
-									request.addEventListener('load', function () {
-										response = JSON.parse(request.response);
+					navigator.credentials.get({
+						publicKey: webauthn.publicKey
 
-										if (response.success) {
-//											window.history.replaceState({}, 'Logged in', '/logged_in');
-											window.location.href = '/dashboard';
-//											window.location.href = '/logged_in';
-										}
-									});
-								});
+					}).then((assertion) => {
+						let authData = assertion.response.authenticatorData;
+						let clientDataJSON = assertion.response.clientDataJSON;
+						let rawId = assertion.rawId;
+						let sig = assertion.response.signature;
+						let userHandle = assertion.response.userHandle;
+
+						request = new XMLHttpRequest();
+						request.open('POST', '/api/auth/login', true);
+						request.send(JSON.stringify({
+							username: username.value,
+							passwordHash: hash.encoded,
+							id: assertion.id,
+							rawId: bufferEncode(rawId),
+							type: assertion.type,
+							response: {
+								authenticatorData: bufferEncode(authData),
+								clientDataJSON: bufferEncode(clientDataJSON),
+								signature: bufferEncode(sig),
+								userHandle: bufferEncode(userHandle),
+							},
+						}));
+
+						request.addEventListener('load', function () {
+							response = JSON.parse(request.response);
+
+							if (response.success) {
+								alertUser(document.getElementById('main'), 'success', response.message);
+//								window.history.replaceState({}, 'Logged in', '/logged_in');
+								window.location.href = '/dashboard';
+//								window.location.href = '/logged_in';
+							} else {
+								alertUser(document.getElementById('main'), 'failure', response.message);
 							}
-						}
+						});
+
+					}).catch(function (error) {
+						alertUser(document.getElementById('main'), 'failure', 'Webauthn authentication failed.');
 					});
 				});
-			}
+			});
 		});
 	}
 }
@@ -110,7 +178,11 @@ function login() {
 	}
 }*/
 
-function register() {
+function register(event) {
+	if (event && event.type !== 'click' && (event.type == 'keydown' && event.code !== 'Enter')) {
+		return;
+	}
+
 	username = document.getElementById('username');
 	password = document.getElementById('password');
 
@@ -125,8 +197,12 @@ function register() {
 		argon2.hash({pass: password.value, salt: salt, time: 20, type:argon2.ArgonType.Argon2id}).then(function (hash) {
 			makeJSONRequest('/api/auth/register', {'username': username.value, 'passwordHash': hash.encoded, 'salt': salt}, 'POST').then(function (response) {
 				if (response.success) {
+					alertUser(document.getElementById('main'), 'success', response.message);
 					window.location.href = '/dashboard';
 //					window.history.replaceState({}, 'Registered', '/registered');
+
+				} else {
+					alertUser(document.getElementById('main'), 'failure', response.message);
 				}
 			});
 		});
@@ -167,6 +243,11 @@ function bufferDecode(value) {
 
 function registerTOTP() {
 	makeJSONRequest('/api/auth/register/totp', {}, 'POST').then((totpResponse) => {
+		if (!totpResponse.success) {
+			alertUser(document.getElementById('main'), 'failure', totpResponse.message);
+			return;
+		}
+
 		image = document.createElement("img");
 
 		QRCode.toDataURL(totpResponse.data).then((uri)=>{
@@ -177,6 +258,7 @@ function registerTOTP() {
 		});
 
 		console.log(totpResponse);
+		alertUser(document.getElementById('main'), 'success', totpResponse.message);
 	});
 }
 
@@ -215,13 +297,19 @@ function registerWebauthn() {
 
 		}, 'POST')
 
-	}).then((success) => {
-		alert('successfully registered!')
-		return
+	}).then((response) => {
+		if (response.success) {
+			alertUser(document.getElementById('main'), 'success', 'Successfully registered.');
+
+		} else {
+			alertUser(document.getElementById('main'), 'failure', 'Failed to register webauthn.');
+		}
+
+		return;
 
 	}).catch((error) => {
-		console.log(error)
-		alert('failed to register.')
+		alertUser(document.getElementById('main'), 'failure', 'Failed to register webauthn.');
+		console.log(error);
 	});
 }
 

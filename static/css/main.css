@@ -80,11 +80,46 @@ body, .background {
 	background-size: cover;
 }
 
-.prompt, .background {
-	border-radius: 20px;
+.background, .prompt {
 	max-height: 400px;
 	max-width: 400px;
 	min-width: 12em;
 	padding: 5% 3% 5% 3%;
 	width: 50%;
+}
+
+.background, .prompt, .failure, .success {
+	border-radius: 10px;
+	border-style: solid;
+	border-width: 3px;
+}
+
+.alert {
+	padding: 2% 3% 2% 3%;
+}
+
+.alert p {
+	margin: 0px 0px 0px 0px;
+}
+
+.failure {
+	background-color: #FF0000;
+	border-color: #FFAAAA;
+}
+
+.success {
+	background-color: #00EE00;
+	border-color: #99EE99;
+}
+
+.hidden {
+	visibility: hidden;
+	opacity: 0;
+	transition: visibility 0s 1s, opacity 1s linear;
+}
+
+.visible {
+	visibility: visible;
+	opacity: 1;
+	transition: opacity 0.5s linear;
 }

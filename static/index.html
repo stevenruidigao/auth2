@@ -1,12 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
-		<script src="/js/qrcode/build/qrcode.min.js"></script>
+		<link rel="stylesheet" href="/css/main.css" defer>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<script src="/js/main.js"></script>
 	</head>
 	<body>
-		<button onclick="goLogin()" type="button">Log in!</button>
-		<button onclick="goRegister()" type="button">Register!</button>
-		<button onclick="registerWebauthn()" type="button">Register Webauthn!</button>
+		<div class="centerfallback fixed background"></div>
+		<div class="centerfallback center fixed prompt">
+			<button id="login" type="button">Log in!</button>
+			<button id="register" type="button">Register!</button>
+		</div>
+		<script src="/js/index.js"></script>
 	</body>
 </html>

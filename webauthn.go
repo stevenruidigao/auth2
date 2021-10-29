@@ -14,7 +14,6 @@ func BeginWebauthnRegistration(writer http.ResponseWriter, request *http.Request
 	user, _ := Authenticate(request)
 
 	if user == nil {
-		fmt.Println(user)
 		utils.JSONResponse(writer, Message{Success: false, Message: "You need to log in first."}, http.StatusUnauthorized)
 		return
 	}
@@ -26,6 +25,7 @@ func BeginWebauthnRegistration(writer http.ResponseWriter, request *http.Request
 	options, sessionData, err := webAuthn.BeginRegistration(user, registerOptions)
 
 	if err != nil {
+		fmt.Println("wa1", err)
 		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
 		return
 	}
@@ -33,7 +33,7 @@ func BeginWebauthnRegistration(writer http.ResponseWriter, request *http.Request
 	err = sessionStore.SaveWebauthnSession("registration", sessionData, request, writer)
 
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("wa2", err)
 		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusInternalServerError)
 		return
 	}
@@ -45,7 +45,7 @@ func FinishWebauthnRegistration(writer http.ResponseWriter, request *http.Reques
 	user, _ := Authenticate(request)
 
 	if user == nil {
-		fmt.Println(user)
+		//		fmt.Println(user)
 		utils.JSONResponse(writer, Message{Success: false, Message: "You need to log in first."}, http.StatusUnauthorized)
 		return
 	}
@@ -54,15 +54,17 @@ func FinishWebauthnRegistration(writer http.ResponseWriter, request *http.Reques
 	sessionData, err := sessionStore.GetWebauthnSession("registration", request)
 
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("wa3", err)
 		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusBadRequest)
 		return
 	}
 
 	credential, err := webAuthn.FinishRegistration(user, sessionData, request)
 
+	fmt.Println("wa4 e", err, "u", user, "s", sessionData, "c", credential, "r", request)
+
 	if err != nil {
-		fmt.Println(err)
+		//		fmt.Println("wa4 e", err, "u", user, "s", sessionData, "c", credential, "r", request)
 		utils.JSONResponse(writer, Message{Success: false, Message: "An error occurred."}, http.StatusBadRequest)
 		return
 	}
